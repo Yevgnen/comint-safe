@@ -33,7 +33,7 @@
   :group 'comint)
 
 (defcustom comint-truncate-display
-  " #.#.#.# "
+  " *** output truncated *** "
   "String to represent the truncated contents"
   :type 'string)
 
