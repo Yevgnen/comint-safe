@@ -33,7 +33,7 @@
   :group 'comint)
 
 (defcustom comint-truncate-display
-  " *** output truncated *** "
+  "truncated!"
   "String to represent the truncated contents"
   :type 'string)
 
@@ -42,33 +42,42 @@
   "List of command after which trigger truncates."
   :type '(repeat symbol))
 
+(defcustom comint-truncate-threshold
+  10000
+  "String length larger than which will be truncated."
+  :type 'integer)
+
 (defvar comint-truncate--chunks nil)
+(defvar comint-truncate--size 0)
 (make-variable-buffer-local 'comint-truncate--chunks)
+(make-variable-buffer-local 'comint-truncate--size)
 
 (defun comint-truncate-filter-long-lines (str)
   (if (memq last-command comint-truncate-commands)
       (progn
-        (push str comint-truncate--chunks)
         (if (not (string-match comint-prompt-regexp str))
-            ""
-          (let* ((out (mapconcat #'identity (nreverse comint-truncate--chunks) ""))
-                 (split-str (split-string out "\n"))
-                 (max-len (* 10 (window-width)))
-                 (disp-left (round (* (/ 1.0 3) (window-width))))
-                 (disp-right disp-left)
-                 (truncated (mapconcat
-                             (lambda (x)
-                               (if (> (length x) max-len)
-                                   (concat (substring x 0 disp-left) comint-truncate-display (substring x (- disp-right)))
-                                 x))
-                             split-str "\n")))
-            (setq comint-truncate--chunks nil)
+            (progn
+              (push str comint-truncate--chunks)
+              (incf comint-truncate--size (length str))
+              "")
+          ;; The prompt may come with the last trunk.
+          (let ((last-lines (split-string str "\n")))
+            (if (> (length last-lines) 2)
+                (setq str (car (last last-lines)))))
+          (let* ((content (if (> comint-truncate--size comint-truncate-threshold)
+                              (concat comint-truncate-display "\n")
+                            (mapconcat #'identity (nreverse comint-truncate--chunks) "")))
+                 (truncated (concat content str)))
+            (setq comint-truncate--chunks nil
+                  comint-truncate--size 0)
             truncated)))
+    (setq comint-truncate--chunks nil
+          comint-truncate--size 0)
     str))
 
 (defun comint-truncate-highlight-display ()
   (font-lock-add-keywords
-   nil `((,(regexp-quote comint-truncate-display) 0 'error prepend))))
+   nil `((,(regexp-quote comint-truncate-display) 0 'warning prepend))))
 
 ;;;###autoload
 (define-minor-mode comint-truncate-mode
